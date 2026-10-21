@@ -1,0 +1,39 @@
+name: Validate public profile
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Required public files
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f LICENSE
+          test -f resume/resume.md
+          test -f resume/resume.pdf
+          test -f portfolio/projects.md
+          for forbidden in data applications interviews feedback; do
+            if [ -e "$forbidden" ]; then
+              echo "Unexpected private path: $forbidden"
+              exit 1
+            fi
+          done
+          signature=$(od -An -t x1 -N 4 resume/resume.pdf | tr -d ' \n')
+          test "$signature" = "25504446"
+
+      - name: Reject private markers
+        run: |
+          if grep -RIlE --exclude-dir=.git --exclude-dir=.github "DO_NOT_PUBLISH|BEGIN [A-Z ]*PRIVATE KEY|ghp_[A-Za-z0-9]{20,}" .; then
+            echo "Private marker found in the public repository."
+            exit 1
+          fi
